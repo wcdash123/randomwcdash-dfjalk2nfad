@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>World Cup Props — Order Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 16px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    h1 { font-size: 20px; color: #a0c4ff; }
+
+    .updated-chip {
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 6px 12px;
+      color: #aaa;
+      font-size: 12px;
+    }
+    .updated-chip strong { color: #7eb8f7; font-weight: 700; }
+
+    .summary {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 6px 14px;
+    }
+    .sum-stat { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .sum-label {
+      color: #a0c4ff; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .sum-value { color: #57cc99; font-size: 16px; font-weight: 700; }
+    .sum-sep { width: 1px; height: 30px; background: #2a2a4a; }
+
+    .search-box {
+      background: #16213e;
+      border: 1px solid #3a3a6a;
+      color: #e0e0e0;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 13px;
+      width: 200px;
+      margin-bottom: 12px;
+    }
+    .search-box:focus { outline: none; border-color: #4361ee; }
+    .search-box::placeholder { color: #555; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      border-collapse: collapse;
+      min-width: 100%;
+      white-space: nowrap;
+    }
+
+    thead th {
+      background: #16213e;
+      color: #a0c4ff;
+      padding: 8px 10px;
+      text-align: center;
+      border-bottom: 2px solid #2a2a4a;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: #c0d8ff; }
+    thead th.sort-asc::after  { content: ' ▲'; font-size: 10px; opacity: 0.7; }
+    thead th.sort-desc::after { content: ' ▼'; font-size: 10px; opacity: 0.7; }
+
+    tbody tr { border-bottom: 1px solid #2a2a4a; }
+    tbody tr:hover { background: #1f2a4a; }
+
+    td {
+      padding: 6px 10px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    td.left { text-align: left; }
+
+    .roi-pos { color: #57cc99; font-weight: 600; }
+    .roi-neg { color: #aaa; }
+
+    #noData { text-align: center; padding: 40px; color: #666; font-size: 14px; }
+
+    /* ── Fill feed (static snapshot) ── */
+    .fill-feed-section { margin-bottom: 14px; }
+    .fill-feed-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 14px; background: #16213e;
+      border: 1px solid #2a2a4a; border-radius: 6px 6px 0 0;
+      cursor: pointer; user-select: none;
+    }
+    .fill-feed-section.collapsed .fill-feed-header { border-radius: 6px; }
+    .fill-feed-title { color: #a0c4ff; font-weight: 700; font-size: 13px;
+      letter-spacing: .05em; text-transform: uppercase; flex: 1; }
+    .fill-feed-meta  { color: #666; font-size: 11px; }
+    .fill-feed-toggle {
+      background: none; border: none; color: #4361ee;
+      font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    }
+    .fill-feed-toggle:hover { background: #1e2540; color: #a0c4ff; }
+    .fill-feed-body {
+      background: #0d1117; border: 1px solid #2a2a4a; border-top: none;
+      border-radius: 0 0 6px 6px; max-height: 240px; overflow-y: auto;
+    }
+    .fill-feed-section.collapsed .fill-feed-body { display: none; }
+    .fill-feed-empty { text-align: center; color: #444; font-size: 12px; padding: 18px; }
+    .fill-row {
+      display: grid;
+      grid-template-columns: 62px 1fr 90px 52px 44px 54px;
+      align-items: center; gap: 0 8px;
+      padding: 5px 14px; border-bottom: 1px solid #161c2a; font-size: 12px;
+    }
+    .fill-row:last-child { border-bottom: none; }
+    .fill-row:hover { background: #111c2e; }
+    .fill-row.fill-orange { background:#1a1200; border-left:3px solid #f97316; padding-left:11px; }
+    .fill-row.fill-red    { background:#1a0505; border-left:3px solid #ef4444; padding-left:11px; }
+    .fill-time      { color:#666; font-size:11px; font-variant-numeric:tabular-nums; }
+    .fill-player    { color:#e0e0e0; font-weight:600; overflow:hidden; text-overflow:ellipsis; }
+    .fill-team      { color:#888; font-size:11px; }
+    .fill-stat      { color:#888; font-size:11px; text-align:right; }
+    .fill-side-no   { background:#1a2a4a; color:#7eb8f7; border-radius:3px; padding:1px 6px; font-weight:700; font-size:11px; text-align:center; }
+    .fill-side-yes  { background:#0d2a1a; color:#57cc99;  border-radius:3px; padding:1px 6px; font-weight:700; font-size:11px; text-align:center; }
+    .fill-price     { color:#ccc; font-variant-numeric:tabular-nums; text-align:right; }
+    .fill-contracts { font-weight:700; font-variant-numeric:tabular-nums; text-align:right; }
+    .fill-contracts.orange { color:#f97316; }
+    .fill-contracts.red    { color:#ef4444; }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>World Cup Props — Orders</h1>
+  <span class="updated-chip" id="updatedChip">Loading…</span>
+  <div class="summary">
+    <div class="sum-stat">
+      <span class="sum-label">Avg ROI</span>
+      <span class="sum-value" id="avgRoi">—</span>
+    </div>
+    <div class="sum-sep"></div>
+    <div class="sum-stat">
+      <span class="sum-label">Total Filled</span>
+      <span class="sum-value" id="filledTotal">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fill Feed (snapshot) ── -->
+<div class="fill-feed-section" id="fillFeedSection">
+  <div class="fill-feed-header" onclick="toggleFillFeed()">
+    <span class="fill-feed-title">&#9679; Fill Feed</span>
+    <span class="fill-feed-meta" id="fillFeedMeta">—</span>
+    <button class="fill-feed-toggle" id="fillFeedToggleBtn">&#9650; Collapse</button>
+  </div>
+  <div class="fill-feed-body" id="fillFeedBody">
+    <div class="fill-feed-empty" id="fillFeedEmpty">No fills in this snapshot.</div>
+  </div>
+</div>
+
+<input type="text" class="search-box" id="searchBox" placeholder="Search player…"
+       oninput="onSearch(this.value)" />
+
+<div class="table-wrap">
+  <table id="ordersTable">
+    <thead>
+      <tr>
+        <th colspan="3" style="background:#16213e;border-bottom:none"></th>
+        <th colspan="7" style="background:#1a1e35;color:#7eb8f7;border-bottom:2px solid #3a5a8a;font-size:11px;letter-spacing:.06em">— NO Side —</th>
+        <th colspan="7" style="background:#1e1a35;color:#a78bfa;border-bottom:2px solid #6a3a9a;font-size:11px;letter-spacing:.06em">— YES Side —</th>
+      </tr>
+      <tr>
+        <th data-col="0"  onclick="sortBy(0)">Game</th>
+        <th data-col="1"  onclick="sortBy(1)">Market</th>
+        <th data-col="2"  onclick="sortBy(2)">Player</th>
+        <th data-col="3"  onclick="sortBy(3)"  style="color:#7eb8f7">No<br>Price</th>
+        <th data-col="4"  onclick="sortBy(4)"  style="color:#7eb8f7">No<br>Qty</th>
+        <th data-col="5"  onclick="sortBy(5)"  style="color:#7eb8f7">Matched $<br>No</th>
+        <th data-col="6"  onclick="sortBy(6)"  style="color:#7eb8f7">Avg Price<br>No</th>
+        <th data-col="7"  onclick="sortBy(7)"  style="color:#7eb8f7">ROI%<br>No</th>
+        <th data-col="8"  onclick="sortBy(8)"  style="color:#7eb8f7" title="Total matched $ across all No markets for this player">Exp/<br>Player No</th>
+        <th data-col="9"  onclick="sortBy(9)"  style="color:#7eb8f7" title="YES if any individual NO fill today was 300+ contracts">Sharp<br>No</th>
+        <th data-col="10" onclick="sortBy(10)" style="color:#a78bfa">Yes<br>Price</th>
+        <th data-col="11" onclick="sortBy(11)" style="color:#a78bfa">Yes<br>Qty</th>
+        <th data-col="12" onclick="sortBy(12)" style="color:#a78bfa">Matched $<br>Yes</th>
+        <th data-col="13" onclick="sortBy(13)" style="color:#a78bfa">Avg Price<br>Yes</th>
+        <th data-col="14" onclick="sortBy(14)" style="color:#a78bfa">ROI%<br>Yes</th>
+        <th data-col="15" onclick="sortBy(15)" style="color:#a78bfa" title="Total matched $ across all Yes markets for this player">Exp/<br>Player Yes</th>
+        <th data-col="16" onclick="sortBy(16)" style="color:#a78bfa" title="YES if any individual YES fill today was 300+ contracts">Sharp<br>Yes</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="17" id="noData">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // Set by the setup script when publishing this page; the raw URL serves
+  // fresh data seconds after a push (Pages itself can lag a build behind).
+  const REPO = 'wcdash123/randomwcdash-dfjalk2nfad';
+
+  let _allOrders  = [];
+  let _searchText = '';
+  let _sortCol    = null;
+  let _sortDir    = 1;
+
+  // col index → value extractor (one merged row per ticker)
+  const COL_KEYS = [
+    o => o.game                  || '',   // 0  Game
+    o => o.total                 ?? -1e9, // 1  Market (sorts by threshold)
+    o => (o.full_name || o.lastname) || '', // 2 Player
+    o => o.no_price              ?? -1e9, // 3
+    o => o.no_qty                ?? -1e9, // 4
+    o => o.matched_dollars_no    ?? -1e9, // 5
+    o => o.matched_avg_price_no  ?? -1e9, // 6
+    o => o.matched_roi_pct_no    ?? -1e9, // 7
+    o => o.exp_per_player_no     ?? -1e9, // 8
+    o => o.no_sharp_action       ? 1 : 0, // 9
+    o => o.yes_price             ?? -1e9, // 10
+    o => o.yes_qty               ?? -1e9, // 11
+    o => o.matched_dollars_yes   ?? -1e9, // 12
+    o => o.matched_avg_price_yes ?? -1e9, // 13
+    o => o.matched_roi_pct_yes   ?? -1e9, // 14
+    o => o.exp_per_player_yes    ?? -1e9, // 15
+    o => o.yes_sharp_action      ? 1 : 0, // 16
+  ];
+  const _STR_COLS = new Set([0, 2]);
+
+  function sortBy(col) {
+    if (col >= COL_KEYS.length || COL_KEYS[col] === null) return;
+    if (_sortCol === col) {
+      _sortDir *= -1;
+    } else {
+      _sortCol = col;
+      _sortDir = _STR_COLS.has(col) ? 1 : -1;
+    }
+    document.querySelectorAll('thead th[data-col]').forEach(th => {
+      const c = parseInt(th.dataset.col, 10);
+      th.classList.toggle('sort-asc',  c === _sortCol && _sortDir ===  1);
+      th.classList.toggle('sort-desc', c === _sortCol && _sortDir === -1);
+    });
+    applyFilter();
+  }
+
+  function _applySorted(rows) {
+    if (_sortCol === null || COL_KEYS[_sortCol] === null) return rows;
+    const key = COL_KEYS[_sortCol];
+    return [...rows].sort((a, b) => {
+      const av = key(a), bv = key(b);
+      if (av === bv) return 0;
+      if (av === -1e9) return 1;   // nulls always last
+      if (bv === -1e9) return -1;
+      if (typeof av === 'string') return av.localeCompare(bv) * _sortDir;
+      return (av - bv) * _sortDir;
+    });
+  }
+
+  // FIFA country codes are always exactly 3 letters.
+  function splitGame(game) {
+    if (!game || game.length < 6) return [game || '', ''];
+    return [game.substring(0, 3), game.substring(3)];
+  }
+
+  // One merged row per ticker (NO + YES sides combined), same logic as the
+  // private orders page.
+  function groupByTicker(orders) {
+    const byTicker = new Map();
+    const fallbackKey = () => `__noticker__${Math.random()}`;
+    for (const o of orders) {
+      const key = o.ticker || fallbackKey();
+      if (!byTicker.has(key)) {
+        byTicker.set(key, {
+          ticker: o.ticker, game: o.game, team: o.team, total: o.total,
+          stat_type: o.stat_type, full_name: o.full_name, lastname: o.lastname,
+          matched_dollars_no: o.matched_dollars_no,
+          matched_avg_price_no: o.matched_avg_price_no,
+          matched_roi_pct_no: o.matched_roi_pct_no,
+          exp_per_player_no: o.exp_per_player_no,
+          matched_dollars_yes: o.matched_dollars_yes,
+          matched_avg_price_yes: o.matched_avg_price_yes,
+          matched_roi_pct_yes: o.matched_roi_pct_yes,
+          exp_per_player_yes: o.exp_per_player_yes,
+          no_price: null, no_qty: null, yes_price: null, yes_qty: null,
+          no_sharp_action: false, yes_sharp_action: false,
+        });
+      }
+      const m = byTicker.get(key);
+      if (o.side === 'no') {
+        if (m.no_price === null) { m.no_price = o.price; m.no_qty = o.remaining_count; }
+        else {
+          m.no_qty = (m.no_qty || 0) + (o.remaining_count || 0);
+          if (o.price != null && o.price > (m.no_price ?? -1)) m.no_price = o.price;
+        }
+      } else if (o.side === 'yes') {
+        if (m.yes_price === null) { m.yes_price = o.price; m.yes_qty = o.remaining_count; }
+        else {
+          m.yes_qty = (m.yes_qty || 0) + (o.remaining_count || 0);
+          if (o.price != null && o.price > (m.yes_price ?? -1)) m.yes_price = o.price;
+        }
+      }
+      if (o.sharp_action_no)  m.no_sharp_action  = true;
+      if (o.sharp_action_yes) m.yes_sharp_action = true;
+    }
+    return [...byTicker.values()];
+  }
+
+  function onSearch(val) {
+    _searchText = val.trim().toLowerCase();
+    applyFilter();
+  }
+
+  function applyFilter() {
+    let merged = groupByTicker(_allOrders);
+    if (_searchText) {
+      merged = merged.filter(o =>
+        (o.full_name || o.lastname || '').toLowerCase().includes(_searchText));
+    }
+    updateSummary(merged);
+    renderTable(_applySorted(merged));
+  }
+
+  function updateSummary(merged) {
+    let total = 0, roiWeightedSum = 0, roiWeightTotal = 0;
+    for (const o of merged) {
+      const dNo  = o.matched_dollars_no  != null ? o.matched_dollars_no  : 0;
+      const dYes = o.matched_dollars_yes != null ? o.matched_dollars_yes : 0;
+      total += dNo + dYes;
+      if (dNo > 0 && o.matched_roi_pct_no != null) {
+        roiWeightedSum += dNo * o.matched_roi_pct_no; roiWeightTotal += dNo;
+      }
+      if (dYes > 0 && o.matched_roi_pct_yes != null) {
+        roiWeightedSum += dYes * o.matched_roi_pct_yes; roiWeightTotal += dYes;
+      }
+    }
+    document.getElementById('filledTotal').textContent =
+      total > 0 ? `$${total.toFixed(2)}` : '—';
+    const avgRoiEl = document.getElementById('avgRoi');
+    if (roiWeightTotal > 0) {
+      const avgRoi = roiWeightedSum / roiWeightTotal;
+      avgRoiEl.style.color = avgRoi > 0 ? '#57cc99' : '#ef5350';
+      avgRoiEl.textContent = `${avgRoi.toFixed(1)}%`;
+    } else {
+      avgRoiEl.style.color = '#57cc99';
+      avgRoiEl.textContent = '—';
+    }
+  }
+
+  function fmtROI(val) {
+    if (val === null || val === undefined) return '—';
+    const cls = val > 0 ? 'roi-pos' : 'roi-neg';
+    return `<span class="${cls}">${val.toFixed(1)}%</span>`;
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="17" id="noData">No active orders right now.</td></tr>';
+      return;
+    }
+    rows.forEach(o => {
+      const [t1, t2] = splitGame(o.game || '');
+      const gameDisp = t2 ? `${t1} vs ${t2}` : (o.game || '');
+      const statAbbr = o.stat_type === 'goals' ? 'goal' : o.stat_type === 'assists' ? 'ast' : 'soa';
+      const totalDisp = o.stat_type === 'soa'
+        ? 'S/A <span style="color:#888;font-weight:400;font-size:11px">soa</span>'
+        : (o.total != null ? `${Math.floor(o.total + 0.6)}+ <span style="color:#888;font-weight:400;font-size:11px">${statAbbr}</span>` : '—');
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${esc(gameDisp)}</td>
+        <td>${totalDisp}</td>
+        <td class="left">${esc(o.full_name || o.lastname || '')}</td>
+        <td style="background:#111825">${o.no_price  != null ? `<strong>${o.no_price}¢</strong>`  : '—'}</td>
+        <td style="background:#111825">${o.no_qty    != null ? o.no_qty    : '—'}</td>
+        <td style="background:#111825;color:#7eb8f7">${(o.matched_dollars_no != null && o.matched_dollars_no > 0) ? `$${o.matched_dollars_no.toFixed(2)}` : '—'}</td>
+        <td style="background:#111825;color:#7eb8f7">${(o.matched_avg_price_no != null && o.matched_avg_price_no > 0) ? `${o.matched_avg_price_no.toFixed(1)}¢` : '—'}</td>
+        <td style="background:#111825">${fmtROI(o.matched_roi_pct_no)}</td>
+        <td style="background:#111825;color:#7eb8f7">${o.exp_per_player_no != null ? '$' + o.exp_per_player_no.toFixed(2) : '—'}</td>
+        <td style="background:#111825;color:${o.no_sharp_action ? '#facc15' : '#555'};font-weight:${o.no_sharp_action ? 'bold' : 'normal'}">${o.no_sharp_action ? 'YES' : '—'}</td>
+        <td style="background:#111820">${o.yes_price != null ? `<strong>${o.yes_price}¢</strong>` : '—'}</td>
+        <td style="background:#111820">${o.yes_qty   != null ? o.yes_qty   : '—'}</td>
+        <td style="background:#111820;color:#a78bfa">${(o.matched_dollars_yes != null && o.matched_dollars_yes > 0) ? `$${o.matched_dollars_yes.toFixed(2)}` : '—'}</td>
+        <td style="background:#111820;color:#a78bfa">${(o.matched_avg_price_yes != null && o.matched_avg_price_yes > 0) ? `${o.matched_avg_price_yes.toFixed(1)}¢` : '—'}</td>
+        <td style="background:#111820">${fmtROI(o.matched_roi_pct_yes)}</td>
+        <td style="background:#111820;color:#a78bfa">${o.exp_per_player_yes != null ? '$' + o.exp_per_player_yes.toFixed(2) : '—'}</td>
+        <td style="background:#111820;color:${o.yes_sharp_action ? '#facc15' : '#555'};font-weight:${o.yes_sharp_action ? 'bold' : 'normal'}">${o.yes_sharp_action ? 'YES' : '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ── Fill feed (static snapshot) ─────────────────────────────────────────
+  function toggleFillFeed() {
+    const sec = document.getElementById('fillFeedSection');
+    sec.classList.toggle('collapsed');
+    document.getElementById('fillFeedToggleBtn').textContent =
+      sec.classList.contains('collapsed') ? '▼ Expand' : '▲ Collapse';
+  }
+
+  function renderFills(fills) {
+    const body  = document.getElementById('fillFeedBody');
+    const empty = document.getElementById('fillFeedEmpty');
+    Array.from(body.children).forEach(el => { if (el.id !== 'fillFeedEmpty') el.remove(); });
+    empty.style.display = (fills && fills.length) ? 'none' : 'block';
+    if (!fills || !fills.length) {
+      document.getElementById('fillFeedMeta').textContent = '0 fills';
+      return;
+    }
+    const ORANGE = 100, RED = 250;
+    const frag = document.createDocumentFragment();
+    // fills are newest-first; render oldest at top, latest at bottom
+    for (let i = fills.length - 1; i >= 0; i--) {
+      const f = fills[i];
+      const tier = f.contracts >= RED ? 'red' : f.contracts >= ORANGE ? 'orange' : '';
+      const d = document.createElement('div');
+      d.className = 'fill-row' + (tier ? ` fill-${tier}` : '');
+      const abbr = {goals:'goal', assists:'ast', soa:'soa'}[f.stat] || (f.stat || '');
+      const statLabel = f.line != null ? `${Math.floor(+f.line + .6)}+ ${abbr}` : abbr;
+      d.innerHTML =
+        `<span class="fill-time">${esc(fmtTime(f.created_time))}</span>` +
+        `<span class="fill-player">${esc(f.player)} <span class="fill-team">${esc(f.team)}</span></span>` +
+        `<span class="fill-stat">${esc(statLabel)}</span>` +
+        `<span class="${f.side === 'no' ? 'fill-side-no' : 'fill-side-yes'}">${f.side === 'no' ? 'NO' : 'YES'}</span>` +
+        `<span class="fill-price">${f.price}&cent;</span>` +
+        `<span class="fill-contracts${tier ? ' ' + tier : ''}">${f.contracts}</span>`;
+      frag.appendChild(d);
+    }
+    body.appendChild(frag);
+    body.scrollTop = body.scrollHeight;
+    document.getElementById('fillFeedMeta').textContent =
+      `${fills.length} fill${fills.length !== 1 ? 's' : ''}`;
+  }
+
+  function fmtTime(iso) {
+    try { return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
+    catch (_) { return iso || '—'; }
+  }
+
+  function setUpdatedChip(generatedAt) {
+    const chip = document.getElementById('updatedChip');
+    if (!generatedAt) { chip.textContent = 'No data yet'; return; }
+    const t = new Date(generatedAt);
+    const mins = Math.max(0, Math.round((Date.now() - t.getTime()) / 60000));
+    const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago`
+              : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+    chip.innerHTML = `Last updated <strong>${t.toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})}</strong> (${ago})`;
+  }
+
+  // ── Load ────────────────────────────────────────────────────────────────
+  async function loadData() {
+    const bust = Date.now();
+    const urls = [];
+    if (!REPO.startsWith('__')) {
+      urls.push(`https://raw.githubusercontent.com/${REPO}/main/data.json?v=${bust}`);
+    }
+    urls.push(`data.json?v=${bust}`);
+
+    let data = null;
+    for (const url of urls) {
+      try {
+        const resp = await fetch(url, {cache: 'no-store'});
+        if (resp.ok) { data = await resp.json(); break; }
+      } catch (_) {}
+    }
+    if (!data) {
+      document.getElementById('tableBody').innerHTML =
+        '<tr><td colspan="17" id="noData">Could not load data — try again shortly.</td></tr>';
+      document.getElementById('updatedChip').textContent = 'Load failed';
+      return;
+    }
+    _allOrders = data.orders || [];
+    setUpdatedChip(data.generated_at);
+    renderFills(data.fills || []);
+    applyFilter();
+  }
+
+  loadData();
+</script>
+</body>
+</html>
