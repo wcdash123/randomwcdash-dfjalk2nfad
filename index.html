@@ -478,19 +478,40 @@
   }
 
   // ── Load ────────────────────────────────────────────────────────────────
+  // Source order matters for freshness:
+  //   1. GitHub Contents API — always current (no CDN cache); unauthenticated
+  //      limit is 60 req/hr per viewer IP, plenty for manual reloads.
+  //   2. Relative data.json on Pages — fresh once the Pages build finishes
+  //      (~1 min after a push); query string busts the Pages CDN cache.
+  //   3. raw.githubusercontent.com — last resort; its CDN ignores query
+  //      strings and can serve up to ~5-minute-stale copies.
+  // A candidate that parses but has no generated_at (the pre-first-publish
+  // placeholder) is skipped if a later candidate can do better.
   async function loadData() {
     const bust = Date.now();
-    const urls = [];
+    const candidates = [];
     if (!REPO.startsWith('__')) {
-      urls.push(`https://raw.githubusercontent.com/${REPO}/main/data.json?v=${bust}`);
+      candidates.push({
+        url: `https://api.github.com/repos/${REPO}/contents/data.json?ref=main&t=${bust}`,
+        headers: {Accept: 'application/vnd.github.raw'},
+      });
     }
-    urls.push(`data.json?v=${bust}`);
+    candidates.push({url: `data.json?v=${bust}`, headers: {}});
+    if (!REPO.startsWith('__')) {
+      candidates.push({
+        url: `https://raw.githubusercontent.com/${REPO}/main/data.json?v=${bust}`,
+        headers: {},
+      });
+    }
 
     let data = null;
-    for (const url of urls) {
+    for (const c of candidates) {
       try {
-        const resp = await fetch(url, {cache: 'no-store'});
-        if (resp.ok) { data = await resp.json(); break; }
+        const resp = await fetch(c.url, {cache: 'no-store', headers: c.headers});
+        if (!resp.ok) continue;
+        const parsed = await resp.json();
+        if (parsed && parsed.generated_at) { data = parsed; break; }
+        if (parsed && !data) data = parsed;   // keep as fallback, try fresher sources
       } catch (_) {}
     }
     if (!data) {
