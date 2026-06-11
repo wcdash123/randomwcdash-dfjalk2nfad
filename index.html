@@ -189,7 +189,7 @@
   <table id="ordersTable">
     <thead>
       <tr>
-        <th colspan="3" style="background:#16213e;border-bottom:none"></th>
+        <th colspan="4" style="background:#16213e;border-bottom:none"></th>
         <th colspan="6" style="background:#1a1e35;color:#7eb8f7;border-bottom:2px solid #3a5a8a;font-size:11px;letter-spacing:.06em">— NO Side —</th>
         <th colspan="6" style="background:#1e1a35;color:#a78bfa;border-bottom:2px solid #6a3a9a;font-size:11px;letter-spacing:.06em">— YES Side —</th>
       </tr>
@@ -197,6 +197,7 @@
         <th data-col="0"  onclick="sortBy(0)">Game</th>
         <th data-col="1"  onclick="sortBy(1)">Market</th>
         <th data-col="2"  onclick="sortBy(2)">Player</th>
+        <th data-col="19" onclick="sortBy(19)" title="Locked-in profit from paired NO+YES contracts: pairs × (100¢ − avg No − avg Yes). Negative if the combined cost exceeded 100¢.">Free $</th>
         <th data-col="5"  onclick="sortBy(5)"  style="color:#7eb8f7">Matched $<br>No</th>
         <th data-col="6"  onclick="sortBy(6)"  style="color:#7eb8f7">Avg Price<br>No</th>
         <th data-col="17" onclick="sortBy(17)" style="color:#7eb8f7" title="Payout if this NO position wins: $1 × contracts held">Total Return<br>if Win No</th>
@@ -212,7 +213,7 @@
       </tr>
     </thead>
     <tbody id="tableBody">
-      <tr><td colspan="15" id="noData">Loading…</td></tr>
+      <tr><td colspan="16" id="noData">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -248,6 +249,7 @@
     o => o.yes_sharp_action      ? 1 : 0, // 16
     o => _contractsHeld(o, 'no')  ?? -1e9, // 17 Total return if win — No
     o => _contractsHeld(o, 'yes') ?? -1e9, // 18 Total return if win — Yes
+    o => o.free_dollars ?? -1e9,           // 19 Free $
   ];
   const _STR_COLS = new Set([0, 2]);
 
@@ -267,6 +269,69 @@
   function retIfWinHtml(o, side) {
     const c = _contractsHeld(o, side);
     return (c != null && c > 0) ? `$${c.toFixed(2)}` : '—';
+  }
+
+  // ── Net out opposing positions ───────────────────────────────────────────
+  // When a market holds BOTH NO and YES contracts, the paired portion always
+  // pays exactly $1/contract regardless of outcome. Pairs are removed from
+  // the displayed exposure and their locked-in profit (or loss, if the two
+  // avg prices sum past 100¢) goes to the Free $ column. Only the unpaired
+  // remainder stays as a position.
+  function netPositions(m) {
+    m.free_dollars = null;
+    const cNo  = _contractsHeld(m, 'no');
+    const cYes = _contractsHeld(m, 'yes');
+    if (!cNo || !cYes) return m;
+
+    const avgNo  = m.matched_avg_price_no  || 0;
+    const avgYes = m.matched_avg_price_yes || 0;
+    const paired = Math.min(cNo, cYes);
+    m.free_dollars = Math.round(paired * (100 - avgNo - avgYes)) / 100;
+
+    const remNo  = cNo  - paired;
+    const remYes = cYes - paired;
+    if (remNo > 0) {
+      m.matched_contracts_no = remNo;
+      m.matched_dollars_no   = Math.round(remNo * avgNo) / 100;
+    } else {
+      m.matched_contracts_no = null;
+      m.matched_dollars_no   = null;
+      m.matched_avg_price_no = null;
+      m.matched_roi_pct_no   = null;
+    }
+    if (remYes > 0) {
+      m.matched_contracts_yes = remYes;
+      m.matched_dollars_yes   = Math.round(remYes * avgYes) / 100;
+    } else {
+      m.matched_contracts_yes = null;
+      m.matched_dollars_yes   = null;
+      m.matched_avg_price_yes = null;
+      m.matched_roi_pct_yes   = null;
+    }
+    return m;
+  }
+
+  // Exp/Player comes from the publisher using gross fills — recompute it from
+  // the netted per-market exposure so it matches what the table shows.
+  function recomputeExpPerPlayer(merged) {
+    const expNo = {}, expYes = {};
+    for (const m of merged) {
+      const key = (m.team || '') + '|' + (m.lastname || '');
+      expNo[key]  = (expNo[key]  || 0) + (m.matched_dollars_no  || 0);
+      expYes[key] = (expYes[key] || 0) + (m.matched_dollars_yes || 0);
+    }
+    for (const m of merged) {
+      const key = (m.team || '') + '|' + (m.lastname || '');
+      m.exp_per_player_no  = expNo[key]  > 0 ? Math.round(expNo[key]  * 100) / 100 : null;
+      m.exp_per_player_yes = expYes[key] > 0 ? Math.round(expYes[key] * 100) / 100 : null;
+    }
+  }
+
+  function freeDollarsHtml(o) {
+    if (o.free_dollars == null) return '—';
+    const sign  = o.free_dollars < 0 ? '-$' : '$';
+    const color = o.free_dollars >= 0 ? '#57cc99' : '#ef5350';
+    return `<span style="font-weight:700;color:${color}">${sign}${Math.abs(o.free_dollars).toFixed(2)}</span>`;
   }
 
   function sortBy(col) {
@@ -355,7 +420,8 @@
   }
 
   function applyFilter() {
-    let merged = groupByTicker(_allOrders);
+    let merged = groupByTicker(_allOrders).map(netPositions);
+    recomputeExpPerPlayer(merged);
     if (_searchText) {
       merged = merged.filter(o =>
         (o.full_name || o.lastname || '').toLowerCase().includes(_searchText));
@@ -405,7 +471,7 @@
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
     if (!rows || rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="15" id="noData">No active orders right now.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="16" id="noData">No active orders right now.</td></tr>';
       return;
     }
     rows.forEach(o => {
@@ -421,6 +487,7 @@
         <td>${esc(gameDisp)}</td>
         <td>${totalDisp}</td>
         <td class="left">${esc(o.full_name || o.lastname || '')}</td>
+        <td>${freeDollarsHtml(o)}</td>
         <td style="background:#111825;color:#7eb8f7">${(o.matched_dollars_no != null && o.matched_dollars_no > 0) ? `$${o.matched_dollars_no.toFixed(2)}` : '—'}</td>
         <td style="background:#111825;color:#7eb8f7">${(o.matched_avg_price_no != null && o.matched_avg_price_no > 0) ? `${o.matched_avg_price_no.toFixed(1)}¢` : '—'}</td>
         <td style="background:#111825;color:#7eb8f7">${retIfWinHtml(o, 'no')}</td>
@@ -534,7 +601,7 @@
     }
     if (!data) {
       document.getElementById('tableBody').innerHTML =
-        '<tr><td colspan="15" id="noData">Could not load data — try again shortly.</td></tr>';
+        '<tr><td colspan="16" id="noData">Could not load data — try again shortly.</td></tr>';
       document.getElementById('updatedChip').textContent = 'Load failed';
       return;
     }
