@@ -313,15 +313,25 @@
 
   // Exp/Player comes from the publisher using gross fills — recompute it from
   // the netted per-market exposure so it matches what the table shows.
+  // Keyed by the full ticker player code (e.g. MEXRALVAR25), NOT lastname:
+  // the 5-char truncation collides (Roberto ALVARado vs Edson ALVARez).
+  function playerKey(m) {
+    const parts = (m.ticker || '').toUpperCase().split('-');
+    if (parts.length >= 3) {
+      return parts[0] === 'KXWCSOA' ? parts.slice(2).join('') : parts.slice(2, -1).join('');
+    }
+    return (m.team || '') + '|' + (m.lastname || '');
+  }
+
   function recomputeExpPerPlayer(merged) {
     const expNo = {}, expYes = {};
     for (const m of merged) {
-      const key = (m.team || '') + '|' + (m.lastname || '');
+      const key = playerKey(m);
       expNo[key]  = (expNo[key]  || 0) + (m.matched_dollars_no  || 0);
       expYes[key] = (expYes[key] || 0) + (m.matched_dollars_yes || 0);
     }
     for (const m of merged) {
-      const key = (m.team || '') + '|' + (m.lastname || '');
+      const key = playerKey(m);
       m.exp_per_player_no  = expNo[key]  > 0 ? Math.round(expNo[key]  * 100) / 100 : null;
       m.exp_per_player_yes = expYes[key] > 0 ? Math.round(expYes[key] * 100) / 100 : null;
     }
