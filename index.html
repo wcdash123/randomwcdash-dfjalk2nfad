@@ -317,10 +317,20 @@
   // the 5-char truncation collides (Roberto ALVARado vs Edson ALVARez).
   function playerKey(m) {
     const parts = (m.ticker || '').toUpperCase().split('-');
-    if (parts.length >= 3) {
-      return parts[0] === 'KXWCSOA' ? parts.slice(2).join('') : parts.slice(2, -1).join('');
+    if (parts.length < 3) return (m.team || '') + '|' + (m.lastname || '');
+    let sub;
+    if (parts[0] === 'KXWCTEAMFIRSTGOAL') {
+      sub = parts.slice(3).join('');
+      if (sub === 'GOAL') sub = parts[2] + 'GOAL';  // keep each team's no-goal separate
+    } else if (parts[0] === 'KXWCSOA' || parts[0] === 'KXWCFIRSTGOAL') {
+      sub = parts.slice(2).join('');
+    } else {
+      sub = parts.slice(2, -1).join('');
     }
-    return (m.team || '') + '|' + (m.lastname || '');
+    // Drop the team prefix from standard codes so the same player groups
+    // across all series (team-first-goal subs have no prefix).
+    if (/^[A-Z]{3}[A-Z]+\d+$/.test(sub)) sub = sub.slice(3);
+    return parts[1] + '|' + sub;
   }
 
   function recomputeExpPerPlayer(merged) {
@@ -487,9 +497,10 @@
     rows.forEach(o => {
       const [t1, t2] = splitGame(o.game || '');
       const gameDisp = t2 ? `${t1} vs ${t2}` : (o.game || '');
-      const statAbbr = o.stat_type === 'goals' ? 'goal' : o.stat_type === 'assists' ? 'ast' : 'soa';
-      const totalDisp = o.stat_type === 'soa'
-        ? 'S/A <span style="color:#888;font-weight:400;font-size:11px">soa</span>'
+      const statAbbr = {goals:'goal', assists:'ast', soa:'soa', firstg:'1stG', teamfirstg:'T1stG'}[o.stat_type] || (o.stat_type || '');
+      const NO_THRESH = {soa:'S/A', firstg:'1st Goal', teamfirstg:'Tm 1st'};
+      const totalDisp = NO_THRESH[o.stat_type]
+        ? `${NO_THRESH[o.stat_type]} <span style="color:#888;font-weight:400;font-size:11px">${statAbbr}</span>`
         : (o.total != null ? `${Math.floor(o.total + 0.6)}+ <span style="color:#888;font-weight:400;font-size:11px">${statAbbr}</span>` : '—');
 
       const tr = document.createElement('tr');
@@ -540,7 +551,7 @@
       const tier = f.contracts >= RED ? 'red' : f.contracts >= ORANGE ? 'orange' : '';
       const d = document.createElement('div');
       d.className = 'fill-row' + (tier ? ` fill-${tier}` : '');
-      const abbr = {goals:'goal', assists:'ast', soa:'soa'}[f.stat] || (f.stat || '');
+      const abbr = {goals:'goal', assists:'ast', soa:'soa', firstg:'1stG', teamfirstg:'T1stG'}[f.stat] || (f.stat || '');
       const statLabel = f.line != null ? `${Math.floor(+f.line + .6)}+ ${abbr}` : abbr;
       d.innerHTML =
         `<span class="fill-time">${esc(fmtTime(f.created_time))}</span>` +
