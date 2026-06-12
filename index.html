@@ -320,16 +320,17 @@
     if (parts.length < 3) return (m.team || '') + '|' + (m.lastname || '');
     let sub;
     if (parts[0] === 'KXWCTEAMFIRSTGOAL') {
+      // Subs here already lack the team prefix — never strip
       sub = parts.slice(3).join('');
       if (sub === 'GOAL') sub = parts[2] + 'GOAL';  // keep each team's no-goal separate
-    } else if (parts[0] === 'KXWCSOA' || parts[0] === 'KXWCFIRSTGOAL') {
-      sub = parts.slice(2).join('');
     } else {
-      sub = parts.slice(2, -1).join('');
+      sub = (parts[0] === 'KXWCSOA' || parts[0] === 'KXWCFIRSTGOAL')
+        ? parts.slice(2).join('')
+        : parts.slice(2, -1).join('');
+      // Drop the team prefix from standard codes so the same player groups
+      // across all series (jersey is digits, or 'NA' when unassigned).
+      if (/^[A-Z]{3}[A-Z]+(?:\d+|NA)$/.test(sub)) sub = sub.slice(3);
     }
-    // Drop the team prefix from standard codes so the same player groups
-    // across all series (team-first-goal subs have no prefix).
-    if (/^[A-Z]{3}[A-Z]+\d+$/.test(sub)) sub = sub.slice(3);
     return parts[1] + '|' + sub;
   }
 
