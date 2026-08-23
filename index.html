@@ -256,22 +256,44 @@
   </div>
   <div class="combos-body">
     <div class="table-wrap"><table class="combo-table" id="comboPositionsTable">
-      <thead><tr><th>Combo</th><th>Side</th><th>Legs</th><th>Contracts</th>
-        <th>Avg &cent;</th><th>Matched $</th><th>Prob No</th><th>Prob Yes</th></tr></thead>
+      <thead><tr>
+        <th onclick="comboSortBy('pos',0)">Combo</th>
+        <th onclick="comboSortBy('pos',1)">Side</th>
+        <th onclick="comboSortBy('pos',2)">Legs</th>
+        <th onclick="comboSortBy('pos',3)">Contracts</th>
+        <th onclick="comboSortBy('pos',4)">Avg &cent;</th>
+        <th onclick="comboSortBy('pos',5)">Matched $</th>
+        <th onclick="comboSortBy('pos',6)">Prob No</th>
+        <th onclick="comboSortBy('pos',7)">Prob Yes</th>
+      </tr></thead>
       <tbody id="comboPositionsBody"></tbody>
     </table></div>
 
     <div class="combos-sub">Exposure by Outcome</div>
     <div class="combos-note">Combos containing each single leg outcome &mdash; $ shown is the cost basis (max loss) on those positions</div>
-    <div class="table-wrap"><table class="combo-table">
-      <thead><tr><th>Outcome</th><th>Combos</th><th>NO $</th><th>YES $</th><th>NO ctr</th><th>YES ctr</th></tr></thead>
+    <div class="table-wrap"><table class="combo-table" id="comboSinglesTable">
+      <thead><tr>
+        <th onclick="comboSortBy('singles',0)">Outcome</th>
+        <th onclick="comboSortBy('singles',1)">Combos</th>
+        <th onclick="comboSortBy('singles',2)">NO $</th>
+        <th onclick="comboSortBy('singles',3)">YES $</th>
+        <th onclick="comboSortBy('singles',4)">NO ctr</th>
+        <th onclick="comboSortBy('singles',5)">YES ctr</th>
+      </tr></thead>
       <tbody id="comboSinglesBody"></tbody>
     </table></div>
 
     <div class="combos-sub">Exposure by Outcome Pair</div>
     <div class="combos-note">Combos containing BOTH outcomes (pairs that co-occur in at least one held combo)</div>
-    <div class="table-wrap"><table class="combo-table">
-      <thead><tr><th>Pair</th><th>Combos</th><th>NO $</th><th>YES $</th><th>NO ctr</th><th>YES ctr</th></tr></thead>
+    <div class="table-wrap"><table class="combo-table" id="comboPairsTable">
+      <thead><tr>
+        <th onclick="comboSortBy('pairs',0)">Pair</th>
+        <th onclick="comboSortBy('pairs',1)">Combos</th>
+        <th onclick="comboSortBy('pairs',2)">NO $</th>
+        <th onclick="comboSortBy('pairs',3)">YES $</th>
+        <th onclick="comboSortBy('pairs',4)">NO ctr</th>
+        <th onclick="comboSortBy('pairs',5)">YES ctr</th>
+      </tr></thead>
       <tbody id="comboPairsBody"></tbody>
     </table></div>
   </div>
@@ -785,6 +807,60 @@
     buildGameBar(); renderSimulation(_simData); renderCombos(_combosData); applyFilter();
   }
 
+  // ── Sorting for the combos & sim-combos tables ─────────────────────
+  // dir: -1 = descending (default for numeric cols), 1 = ascending.
+  const _comboSort = {
+    pos:     {col: null, dir: -1},
+    singles: {col: null, dir: -1},
+    pairs:   {col: null, dir: -1},
+    sim:     {col: null, dir: -1},
+  };
+  const _COMBO_POS_KEYS = [
+    p => p.combo || '', p => p.side || '', p => p.n_legs ?? -1,
+    p => p.contracts ?? -1e18, p => p.avg_price ?? -1e18, p => p.dollars ?? -1e18,
+    p => p.prob_no ?? -1e18, p => p.prob_yes ?? -1e18,
+  ];
+  const _COMBO_AGG_KEYS = [
+    r => r.label || '', r => r.positions, r => r.no_dollars, r => r.yes_dollars,
+    r => r.no_contracts, r => r.yes_contracts,
+  ];
+  const _SIM_COMBO_KEYS = [
+    p => p.combo || '', p => p.side || '', p => p.contracts ?? -1e18,
+    p => p.staked ?? -1e18, p => p.p_win ?? -1e18, p => p.worst ?? -1e18,
+    p => p.mean ?? -1e18, p => p.best ?? -1e18,
+  ];
+
+  // Text columns start ascending on first click; numeric ones descending.
+  const _COMBO_TEXT_COLS = {pos: 2, singles: 1, pairs: 1, sim: 2};  // first N cols are text
+
+  function comboSortBy(table, col) {
+    const st = _comboSort[table];
+    if (st.col === col) st.dir = -st.dir;
+    else { st.col = col; st.dir = col < _COMBO_TEXT_COLS[table] ? 1 : -1; }
+    if (table === 'sim') renderSimulation(_simData);
+    else renderCombos(_combosData);
+  }
+
+  function _comboSorted(rowsIn, keys, st) {
+    if (st.col === null) return rowsIn;
+    const k = keys[st.col];
+    return [...rowsIn].sort((a, b) => {
+      const va = k(a), vb = k(b);
+      if (typeof va === 'string' || typeof vb === 'string')
+        return String(va).localeCompare(String(vb)) * st.dir;
+      return (va - vb) * st.dir;
+    });
+  }
+
+  function _markSort(tableId, st) {
+    const t = document.getElementById(tableId);
+    if (!t) return;
+    t.querySelectorAll('thead th').forEach((th, i) => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (st.col === i) th.classList.add(st.dir === 1 ? 'sort-asc' : 'sort-desc');
+    });
+  }
+
   // ── Combos: positions + exposure aggregations under the game filter ───
   function _comboMoney(v) {
     return (v < 0 ? '-$' : '$') + Math.abs(v || 0).toFixed(2);
@@ -806,7 +882,8 @@
       `${kept.length} of ${pos.length} position(s)` +
       (d.window_start_ts ? ` — fills since ${new Date(d.window_start_ts * 1000).toLocaleString()}` : '');
 
-    document.getElementById('comboPositionsBody').innerHTML = kept.map(p => `
+    const keptSorted = _comboSorted(kept, _COMBO_POS_KEYS, _comboSort.pos);
+    document.getElementById('comboPositionsBody').innerHTML = keptSorted.map(p => `
       <tr>
         <td>${esc(p.combo)}</td>
         <td style="text-align:center"><span class="badge-${p.side}">${p.side.toUpperCase()}</span></td>
@@ -844,9 +921,11 @@
                x.label + ' AND ' + y.label, p.side, p.dollars, p.contracts);
         }
     }
+    // Default order: total $ at risk, descending; a header click overrides.
     const rows = agg => [...agg.values()]
       .sort((a, b) => (b.no_dollars + b.yes_dollars) - (a.no_dollars + a.yes_dollars));
-    const aggHtml = agg => rows(agg).slice(0, 300).map(r => `
+    const aggHtml = (agg, st) => _comboSorted(rows(agg), _COMBO_AGG_KEYS, st)
+      .slice(0, 300).map(r => `
       <tr>
         <td>${esc(r.label)}</td>
         <td>${r.positions}</td>
@@ -856,8 +935,11 @@
         <td>${r.yes_contracts.toFixed(2)}</td>
       </tr>`).join('') ||
       '<tr><td colspan="6" class="combos-empty">—</td></tr>';
-    document.getElementById('comboSinglesBody').innerHTML = aggHtml(singles);
-    document.getElementById('comboPairsBody').innerHTML   = aggHtml(pairs);
+    document.getElementById('comboSinglesBody').innerHTML = aggHtml(singles, _comboSort.singles);
+    document.getElementById('comboPairsBody').innerHTML   = aggHtml(pairs, _comboSort.pairs);
+    _markSort('comboPositionsTable', _comboSort.pos);
+    _markSort('comboSinglesTable',   _comboSort.singles);
+    _markSort('comboPairsTable',     _comboSort.pairs);
   }
 
   // ── Filled-position simulation (read-only render of the published block) ──
@@ -914,7 +996,7 @@
     // run time; shown as-of that run, not re-filtered here).
     const c = sim.combos;
     if (c && c.positions && c.positions.length) {
-      const posRows = c.positions.map(p => `
+      const posRows = _comboSorted(c.positions, _SIM_COMBO_KEYS, _comboSort.sim).map(p => `
         <tr>
           <td>${esc(p.combo)}</td>
           <td style="text-align:center"><span class="badge-${p.side}">${p.side.toUpperCase()}</span></td>
@@ -928,15 +1010,18 @@
       gamesHtml += `<div class="sim-game">`
         + `<div class="sim-game-header" onclick="(function(){var e=document.getElementById('simdash-combos');e.classList.toggle('collapsed');})()">`
         + `▸ Combos (${c.n_positions} position${c.n_positions !== 1 ? 's' : ''})</div>`
-        + `<div class="sim-game-body collapsed" id="simdash-combos">`
+        + `<div class="sim-game-body${_comboSort.sim.col === null ? ' collapsed' : ''}" id="simdash-combos">`
         + _simTable(c)
-        + `<div class="table-wrap"><table class="combo-table" style="margin-top:8px">`
-        + `<thead><tr><th>Combo</th><th>Side</th><th>Contracts</th><th>Staked</th>`
-        + `<th>P(win)</th><th>Worst</th><th>Mean</th><th>Best</th></tr></thead>`
+        + `<div class="table-wrap"><table class="combo-table" id="simCombosTable" style="margin-top:8px">`
+        + `<thead><tr>`
+        + ['Combo', 'Side', 'Contracts', 'Staked', 'P(win)', 'Worst', 'Mean', 'Best']
+            .map((h, i) => `<th onclick="comboSortBy('sim',${i})">${h}</th>`).join('')
+        + `</tr></thead>`
         + `<tbody>${posRows}</tbody></table></div>`
         + `</div></div>`;
     }
     document.getElementById('simGames').innerHTML = gamesHtml;
+    _markSort('simCombosTable', _comboSort.sim);
     const skips = sim.unsimmable || [];
     document.getElementById('simSkipped').innerHTML = skips.length
       ? `<b>${skips.length}</b> position(s) not simmable (game not in the current sim file).` : '';
