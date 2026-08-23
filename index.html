@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>World Cup Props — Order Dashboard</title>
+  <title>Soccer Props — Order Dashboard</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -108,6 +108,54 @@
     #noData { text-align: center; padding: 40px; color: #666; font-size: 14px; }
 
     /* ── Fill feed (static snapshot) ── */
+    /* ── Position simulation panel (read-only) ─────────────────────────── */
+    .sim-section { margin-bottom: 14px; background: #16213e; border: 1px solid #2a2a4a; border-radius: 6px; }
+    .sim-header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; }
+    .sim-title { color: #a0c4ff; font-weight: 700; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; }
+    .sim-meta { color: #888; font-size: 11px; flex: 1; }
+    .sim-body { padding: 2px 14px 14px; }
+    .sim-headline-title { color: #e0e0e0; font-weight: 700; font-size: 14px; margin: 8px 0 2px; }
+    .sim-sub { color: #888; font-size: 11px; margin-bottom: 4px; }
+    .sim-table { border-collapse: collapse; font-size: 13px; margin: 4px 0; min-width: 360px; }
+    .sim-table th { text-align: right; color: #a0c4ff; font-weight: 700; padding: 3px 14px; font-size: 11px; text-transform: uppercase; }
+    .sim-table th:first-child { text-align: left; }
+    .sim-table td { text-align: right; padding: 3px 14px; border-top: 1px solid #23233f; font-variant-numeric: tabular-nums; }
+    .sim-table td:first-child { text-align: left; color: #cfd6e6; }
+    .sim-pos { color: #57cc99; }
+    .sim-neg { color: #ef5350; }
+    .sim-game { margin-top: 6px; }
+    .sim-game-header { cursor: pointer; user-select: none; color: #a0c4ff; font-weight: 700; font-size: 12px; padding: 8px 0 2px; border-top: 1px solid #23233f; }
+    .sim-game-header:hover { color: #cfe0ff; }
+    .sim-game-body.collapsed { display: none; }
+    .sim-skipped { color: #777; font-size: 11px; margin-top: 10px; line-height: 1.5; }
+    .sim-empty { color: #aaa; font-size: 13px; padding: 8px 0; }
+
+    /* ── Game filter chips ── */
+    .game-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .game-bar-label { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+    .game-chip {
+      background: #16213e; border: 1px solid #2a2a4a; color: #cfd6e6;
+      border-radius: 14px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+      cursor: pointer; user-select: none;
+    }
+    .game-chip:hover { border-color: #4361ee; }
+    .game-chip.off { opacity: .35; text-decoration: line-through; }
+    .game-chip.all { background: #1e2540; color: #a0c4ff; }
+
+    /* ── Combos section (read-only mirror of the private page) ── */
+    .combos-section { margin-bottom: 14px; background: #16213e; border: 1px solid #2a2a4a; border-radius: 6px; }
+    .combos-body { padding: 2px 14px 14px; }
+    .combos-sub { color: #a0c4ff; font-weight: 700; font-size: 12px; margin: 12px 0 2px; }
+    .combos-note { color: #888; font-size: 11px; margin-bottom: 4px; }
+    .combo-table { border-collapse: collapse; font-size: 12px; margin: 4px 0; }
+    .combo-table th { text-align: right; color: #a0c4ff; font-weight: 700; padding: 3px 10px; font-size: 11px; text-transform: uppercase; }
+    .combo-table th:first-child { text-align: left; }
+    .combo-table td { text-align: right; padding: 3px 10px; border-top: 1px solid #23233f; font-variant-numeric: tabular-nums; }
+    .combo-table td:first-child { text-align: left; color: #cfd6e6; }
+    .badge-no  { background: #1a2a4a; color: #7eb8f7; border-radius: 3px; padding: 1px 6px; font-weight: 700; font-size: 11px; }
+    .badge-yes { background: #0d2a1a; color: #57cc99; border-radius: 3px; padding: 1px 6px; font-weight: 700; font-size: 11px; }
+    .combos-empty { color: #aaa; font-size: 13px; padding: 8px 0; }
+
     .fill-feed-section { margin-bottom: 14px; }
     .fill-feed-header {
       display: flex; align-items: center; gap: 12px;
@@ -155,7 +203,7 @@
 <body>
 
 <div class="page-header">
-  <h1>World Cup Props — Orders</h1>
+  <h1>Soccer Props — Orders</h1>
   <span class="updated-chip" id="updatedChip">Loading…</span>
   <div class="summary">
     <div class="sum-stat">
@@ -170,6 +218,11 @@
   </div>
 </div>
 
+<!-- ── Game filter ── -->
+<div class="game-bar" id="gameBar" style="display:none">
+  <span class="game-bar-label">Games</span>
+</div>
+
 <!-- ── Fill Feed (snapshot) ── -->
 <div class="fill-feed-section" id="fillFeedSection">
   <div class="fill-feed-header" onclick="toggleFillFeed()">
@@ -179,6 +232,48 @@
   </div>
   <div class="fill-feed-body" id="fillFeedBody">
     <div class="fill-feed-empty" id="fillFeedEmpty">No fills in this snapshot.</div>
+  </div>
+</div>
+
+<!-- ── Filled-position simulation (read-only) ── -->
+<div class="sim-section" id="simSection" style="display:none">
+  <div class="sim-header">
+    <span class="sim-title">&#127922; Filled-Position Simulation</span>
+    <span class="sim-meta" id="simMeta"></span>
+  </div>
+  <div class="sim-body" id="simBody">
+    <div id="simHeadline"></div>
+    <div id="simGames"></div>
+    <div class="sim-skipped" id="simSkipped"></div>
+  </div>
+</div>
+
+<!-- ── Combos — matched positions & exposure (read-only) ── -->
+<div class="combos-section" id="combosSection" style="display:none">
+  <div class="sim-header">
+    <span class="sim-title">&#128279; Combos &mdash; Matched Positions</span>
+    <span class="sim-meta" id="combosMeta"></span>
+  </div>
+  <div class="combos-body">
+    <div class="table-wrap"><table class="combo-table" id="comboPositionsTable">
+      <thead><tr><th>Combo</th><th>Side</th><th>Legs</th><th>Contracts</th>
+        <th>Avg &cent;</th><th>Matched $</th><th>Prob No</th><th>Prob Yes</th></tr></thead>
+      <tbody id="comboPositionsBody"></tbody>
+    </table></div>
+
+    <div class="combos-sub">Exposure by Outcome</div>
+    <div class="combos-note">Combos containing each single leg outcome &mdash; $ shown is the cost basis (max loss) on those positions</div>
+    <div class="table-wrap"><table class="combo-table">
+      <thead><tr><th>Outcome</th><th>Combos</th><th>NO $</th><th>YES $</th><th>NO ctr</th><th>YES ctr</th></tr></thead>
+      <tbody id="comboSinglesBody"></tbody>
+    </table></div>
+
+    <div class="combos-sub">Exposure by Outcome Pair</div>
+    <div class="combos-note">Combos containing BOTH outcomes (pairs that co-occur in at least one held combo)</div>
+    <div class="table-wrap"><table class="combo-table">
+      <thead><tr><th>Pair</th><th>Combos</th><th>NO $</th><th>YES $</th><th>NO ctr</th><th>YES ctr</th></tr></thead>
+      <tbody id="comboPairsBody"></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -197,15 +292,15 @@
         <th data-col="0"  onclick="sortBy(0)">Game</th>
         <th data-col="1"  onclick="sortBy(1)">Market</th>
         <th data-col="2"  onclick="sortBy(2)">Player</th>
-        <th data-col="19" onclick="sortBy(19)" title="Locked-in profit from paired NO+YES contracts: pairs × (100¢ − avg No − avg Yes). Negative if the combined cost exceeded 100¢.">Free $</th>
+        <th data-col="19" onclick="sortBy(19)" title="Locked-in profit from paired NO+YES contracts, net of fees: pairs × (100¢ − avg No − avg Yes − fees). Negative if the combined cost (incl. fees) exceeded 100¢.">Free $</th>
         <th data-col="5"  onclick="sortBy(5)"  style="color:#7eb8f7">Matched $<br>No</th>
-        <th data-col="6"  onclick="sortBy(6)"  style="color:#7eb8f7">Avg Price<br>No</th>
+        <th data-col="6"  onclick="sortBy(6)"  style="color:#7eb8f7" title="Average fill price after fees (entry price + per-contract taker/maker fee)">Avg Price<br>No</th>
         <th data-col="17" onclick="sortBy(17)" style="color:#7eb8f7" title="Payout if this NO position wins: $1 × contracts held">Total Return<br>if Win No</th>
         <th data-col="7"  onclick="sortBy(7)"  style="color:#7eb8f7">ROI%<br>No</th>
         <th data-col="8"  onclick="sortBy(8)"  style="color:#7eb8f7" title="Total matched $ across all No markets for this player">Exp/<br>Player No</th>
         <th data-col="9"  onclick="sortBy(9)"  style="color:#7eb8f7" title="YES if any individual NO fill today was 300+ contracts">Sharp<br>No</th>
         <th data-col="12" onclick="sortBy(12)" style="color:#a78bfa">Matched $<br>Yes</th>
-        <th data-col="13" onclick="sortBy(13)" style="color:#a78bfa">Avg Price<br>Yes</th>
+        <th data-col="13" onclick="sortBy(13)" style="color:#a78bfa" title="Average fill price after fees (entry price + per-contract taker/maker fee)">Avg Price<br>Yes</th>
         <th data-col="18" onclick="sortBy(18)" style="color:#a78bfa" title="Payout if this YES position wins: $1 × contracts held">Total Return<br>if Win Yes</th>
         <th data-col="14" onclick="sortBy(14)" style="color:#a78bfa">ROI%<br>Yes</th>
         <th data-col="15" onclick="sortBy(15)" style="color:#a78bfa" title="Total matched $ across all Yes markets for this player">Exp/<br>Player Yes</th>
@@ -224,6 +319,10 @@
   const REPO = 'wcdash123/randomwcdash-dfjalk2nfad';
 
   let _allOrders  = [];
+  let _combosData = null;          // published combos block (positions/singles/pairs/games)
+  let _simData    = null;          // published simulation block
+  let _selectedGames = new Set();  // game filter (chips); empty only before first data
+  let _knownGames    = new Set();
   let _searchText = '';
   let _sortCol    = null;
   let _sortDir    = 1;
@@ -285,8 +384,12 @@
 
     const avgNo  = m.matched_avg_price_no  || 0;
     const avgYes = m.matched_avg_price_yes || 0;
+    // Per-contract fees (cents) — taker fees and maker fees on maker-fee markets.
+    // Subtract each paired contract's share on both legs so Free $ is net of fees.
+    const feeNo  = m.matched_fee_pc_no  || 0;
+    const feeYes = m.matched_fee_pc_yes || 0;
     const paired = Math.min(cNo, cYes);
-    m.free_dollars = Math.round(paired * (100 - avgNo - avgYes)) / 100;
+    m.free_dollars = Math.round(paired * (100 - avgNo - avgYes - feeNo - feeYes)) / 100;
 
     const remNo  = cNo  - paired;
     const remYes = cYes - paired;
@@ -313,24 +416,22 @@
 
   // Exp/Player comes from the publisher using gross fills — recompute it from
   // the netted per-market exposure so it matches what the table shows.
-  // Keyed by the full ticker player code (e.g. MEXRALVAR25), NOT lastname:
+  // Keyed by the full ticker player code (e.g. BREMKAYOD33), NOT lastname:
   // the 5-char truncation collides (Roberto ALVARado vs Edson ALVARez).
+  // Only the goal and assist series carry a trailing threshold segment; the
+  // rest end at the sub. Both leagues match, hence the regex.
+  const THRESHOLD_SERIES_RE = /^KX(EPL|LALIGA)(GOAL|AST)$/;
+
   function playerKey(m) {
     const parts = (m.ticker || '').toUpperCase().split('-');
     if (parts.length < 3) return (m.team || '') + '|' + (m.lastname || '');
-    let sub;
-    if (parts[0] === 'KXWCTEAMFIRSTGOAL') {
-      // Subs here already lack the team prefix — never strip
-      sub = parts.slice(3).join('');
-      if (sub === 'GOAL') sub = parts[2] + 'GOAL';  // keep each team's no-goal separate
-    } else {
-      sub = (parts[0] === 'KXWCSOA' || parts[0] === 'KXWCFIRSTGOAL')
-        ? parts.slice(2).join('')
-        : parts.slice(2, -1).join('');
-      // Drop the team prefix from standard codes so the same player groups
-      // across all series (jersey is digits, or 'NA' when unassigned).
-      if (/^[A-Z]{3}[A-Z]+(?:\d+|NA)$/.test(sub)) sub = sub.slice(3);
-    }
+    let sub = THRESHOLD_SERIES_RE.test(parts[0])
+      ? parts.slice(2, -1).join('')
+      : parts.slice(2).join('');
+    // Drop the club prefix from player codes so the same player groups across
+    // all series (jersey is digits, or 'NA' when unassigned). Club subs on the
+    // first-team-to-score page are 3 letters and never match this.
+    if (/^[A-Z]{3}[A-Z]+(?:\d+|NA)$/.test(sub)) sub = sub.slice(3);
     return parts[1] + '|' + sub;
   }
 
@@ -405,11 +506,13 @@
           matched_avg_price_no: o.matched_avg_price_no,
           matched_roi_pct_no: o.matched_roi_pct_no,
           matched_contracts_no: o.matched_contracts_no,
+          matched_fee_pc_no: o.matched_fee_pc_no,
           exp_per_player_no: o.exp_per_player_no,
           matched_dollars_yes: o.matched_dollars_yes,
           matched_avg_price_yes: o.matched_avg_price_yes,
           matched_roi_pct_yes: o.matched_roi_pct_yes,
           matched_contracts_yes: o.matched_contracts_yes,
+          matched_fee_pc_yes: o.matched_fee_pc_yes,
           exp_per_player_yes: o.exp_per_player_yes,
           no_price: null, no_qty: null, yes_price: null, yes_qty: null,
           no_sharp_action: false, yes_sharp_action: false,
@@ -440,9 +543,16 @@
     applyFilter();
   }
 
+  function gameKept(g) {
+    // Unknown/blank games are only shown when no game is deselected.
+    if (!g) return _selectedGames.size === _knownGames.size;
+    return _selectedGames.has(g);
+  }
+
   function applyFilter() {
     let merged = groupByTicker(_allOrders).map(netPositions);
     recomputeExpPerPlayer(merged);
+    merged = merged.filter(o => gameKept(o.game));
     if (_searchText) {
       merged = merged.filter(o =>
         (o.full_name || o.lastname || '').toLowerCase().includes(_searchText));
@@ -511,13 +621,13 @@
         <td class="left">${esc(o.full_name || o.lastname || '')}</td>
         <td>${freeDollarsHtml(o)}</td>
         <td style="background:#111825;color:#7eb8f7">${(o.matched_dollars_no != null && o.matched_dollars_no > 0) ? `$${o.matched_dollars_no.toFixed(2)}` : '—'}</td>
-        <td style="background:#111825;color:#7eb8f7">${(o.matched_avg_price_no != null && o.matched_avg_price_no > 0) ? `${o.matched_avg_price_no.toFixed(1)}¢` : '—'}</td>
+        <td style="background:#111825;color:#7eb8f7">${(o.matched_avg_price_no != null && o.matched_avg_price_no > 0) ? `${(o.matched_avg_price_no + (o.matched_fee_pc_no || 0)).toFixed(1)}¢` : '—'}</td>
         <td style="background:#111825;color:#7eb8f7">${retIfWinHtml(o, 'no')}</td>
         <td style="background:#111825">${fmtROI(o.matched_roi_pct_no)}</td>
         <td style="background:#111825;color:#7eb8f7">${o.exp_per_player_no != null ? '$' + o.exp_per_player_no.toFixed(2) : '—'}</td>
         <td style="background:#111825;color:${o.no_sharp_action ? '#facc15' : '#555'};font-weight:${o.no_sharp_action ? 'bold' : 'normal'}">${o.no_sharp_action ? 'YES' : '—'}</td>
         <td style="background:#111820;color:#a78bfa">${(o.matched_dollars_yes != null && o.matched_dollars_yes > 0) ? `$${o.matched_dollars_yes.toFixed(2)}` : '—'}</td>
-        <td style="background:#111820;color:#a78bfa">${(o.matched_avg_price_yes != null && o.matched_avg_price_yes > 0) ? `${o.matched_avg_price_yes.toFixed(1)}¢` : '—'}</td>
+        <td style="background:#111820;color:#a78bfa">${(o.matched_avg_price_yes != null && o.matched_avg_price_yes > 0) ? `${(o.matched_avg_price_yes + (o.matched_fee_pc_yes || 0)).toFixed(1)}¢` : '—'}</td>
         <td style="background:#111820;color:#a78bfa">${retIfWinHtml(o, 'yes')}</td>
         <td style="background:#111820">${fmtROI(o.matched_roi_pct_yes)}</td>
         <td style="background:#111820;color:#a78bfa">${o.exp_per_player_yes != null ? '$' + o.exp_per_player_yes.toFixed(2) : '—'}</td>
@@ -627,10 +737,209 @@
       document.getElementById('updatedChip').textContent = 'Load failed';
       return;
     }
-    _allOrders = data.orders || [];
+    _allOrders  = data.orders || [];
+    _combosData = data.combos || null;
+    _simData    = data.simulation || null;
     setUpdatedChip(data.generated_at);
     renderFills(data.fills || []);
+    buildGameBar();
+    renderSimulation(_simData);
+    renderCombos(_combosData);
     applyFilter();
+  }
+
+  // ── Game filter chips ─────────────────────────────────────────────────────────────
+  function _allGames() {
+    const games = new Set();
+    (_allOrders || []).forEach(o => { if (o.game) games.add(o.game); });
+    (((_combosData || {}).games) || []).forEach(g => { if (g.game) games.add(g.game); });
+    ((((_simData || {}).per_game) || [])).forEach(g => { if (g.game) games.add(g.game); });
+    return games;
+  }
+
+  function buildGameBar() {
+    const bar = document.getElementById('gameBar');
+    const games = _allGames();
+    // New games arrive selected; deselections persist across reloads.
+    games.forEach(g => { if (!_knownGames.has(g)) { _knownGames.add(g); _selectedGames.add(g); } });
+    [..._knownGames].forEach(g => { if (!games.has(g)) { _knownGames.delete(g); _selectedGames.delete(g); } });
+    if (!_knownGames.size) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    let html = '<span class="game-bar-label">Games</span>';
+    html += `<span class="game-chip all" onclick="selectAllGames()">All</span>`;
+    [..._knownGames].sort().forEach(g => {
+      const [t1, t2] = splitGame(g);
+      const off = _selectedGames.has(g) ? '' : ' off';
+      html += `<span class="game-chip${off}" onclick="toggleGame('${esc(g)}')">${esc(t1)} v ${esc(t2)}</span>`;
+    });
+    bar.innerHTML = html;
+  }
+
+  function toggleGame(g) {
+    if (_selectedGames.has(g)) _selectedGames.delete(g); else _selectedGames.add(g);
+    buildGameBar(); renderSimulation(_simData); renderCombos(_combosData); applyFilter();
+  }
+
+  function selectAllGames() {
+    _knownGames.forEach(g => _selectedGames.add(g));
+    buildGameBar(); renderSimulation(_simData); renderCombos(_combosData); applyFilter();
+  }
+
+  // ── Combos: positions + exposure aggregations under the game filter ───
+  function _comboMoney(v) {
+    return (v < 0 ? '-$' : '$') + Math.abs(v || 0).toFixed(2);
+  }
+
+  function renderCombos(d) {
+    const section = document.getElementById('combosSection');
+    const pos = (d && d.positions) || [];
+    if (!pos.length) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+
+    // A combo is shown when it touches at least one selected game (combos
+    // with no resolvable games only appear with every game selected).
+    const kept = pos.filter(p => (p.games && p.games.length)
+      ? p.games.some(gameKept)
+      : _selectedGames.size === _knownGames.size);
+
+    document.getElementById('combosMeta').textContent =
+      `${kept.length} of ${pos.length} position(s)` +
+      (d.window_start_ts ? ` — fills since ${new Date(d.window_start_ts * 1000).toLocaleString()}` : '');
+
+    document.getElementById('comboPositionsBody').innerHTML = kept.map(p => `
+      <tr>
+        <td>${esc(p.combo)}</td>
+        <td style="text-align:center"><span class="badge-${p.side}">${p.side.toUpperCase()}</span></td>
+        <td>${p.n_legs || '—'}</td>
+        <td>${(p.contracts || 0).toFixed(2)}</td>
+        <td>${p.avg_price != null ? p.avg_price.toFixed(1) : '—'}</td>
+        <td>${_comboMoney(p.dollars)}</td>
+        <td>${p.prob_no  != null ? p.prob_no.toFixed(2)  + '%' : '—'}</td>
+        <td>${p.prob_yes != null ? p.prob_yes.toFixed(2) + '%' : '—'}</td>
+      </tr>`).join('') ||
+      '<tr><td colspan="8" class="combos-empty">No combos in the selected games.</td></tr>';
+
+    // Recompute the exposure tables from the kept positions' per-outcome
+    // breakdowns (same _bump logic as the server), so the aggregations follow
+    // the game filter. Outcomes in unselected games are excluded.
+    const singles = new Map(), pairs = new Map();
+    const bump = (agg, key, label, side, dollars, contracts) => {
+      let s0 = agg.get(key);
+      if (!s0) { s0 = {label, positions: 0, no_dollars: 0, yes_dollars: 0,
+                       no_contracts: 0, yes_contracts: 0}; agg.set(key, s0); }
+      if (side === 'no') { s0.no_dollars += dollars; s0.no_contracts += contracts; }
+      else               { s0.yes_dollars += dollars; s0.yes_contracts += contracts; }
+      s0.positions += 1;
+    };
+    for (const p of kept) {
+      const outs = (p.outcomes || []).filter(o => !o.game || gameKept(o.game));
+      for (const o of outs)
+        bump(singles, o.leg + '|' + o.side, o.label, p.side, p.dollars, p.contracts);
+      for (let i = 0; i < outs.length; i++)
+        for (let j = i + 1; j < outs.length; j++) {
+          const a = outs[i], b = outs[j];
+          const [x, y] = [a, b].sort((u, v) =>
+            (u.leg + '|' + u.side) < (v.leg + '|' + v.side) ? -1 : 1);
+          bump(pairs, x.leg + '|' + x.side + '||' + y.leg + '|' + y.side,
+               x.label + ' AND ' + y.label, p.side, p.dollars, p.contracts);
+        }
+    }
+    const rows = agg => [...agg.values()]
+      .sort((a, b) => (b.no_dollars + b.yes_dollars) - (a.no_dollars + a.yes_dollars));
+    const aggHtml = agg => rows(agg).slice(0, 300).map(r => `
+      <tr>
+        <td>${esc(r.label)}</td>
+        <td>${r.positions}</td>
+        <td>${_comboMoney(r.no_dollars)}</td>
+        <td>${_comboMoney(r.yes_dollars)}</td>
+        <td>${r.no_contracts.toFixed(2)}</td>
+        <td>${r.yes_contracts.toFixed(2)}</td>
+      </tr>`).join('') ||
+      '<tr><td colspan="6" class="combos-empty">—</td></tr>';
+    document.getElementById('comboSinglesBody').innerHTML = aggHtml(singles);
+    document.getElementById('comboPairsBody').innerHTML   = aggHtml(pairs);
+  }
+
+  // ── Filled-position simulation (read-only render of the published block) ──
+  function _simMoney(v) {
+    const cls = v >= 0 ? 'sim-pos' : 'sim-neg';
+    const s = (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    return `<span class="${cls}">${s}</span>`;
+  }
+  function _simPct(v) {
+    if (v === null || v === undefined) return '—';
+    const cls = v >= 0 ? 'sim-pos' : 'sim-neg';
+    return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
+  }
+  function _simTable(s) {
+    const rows = [
+      ['Worst', 'worst'], ['1%', 'p1'], ['10%', 'p10'], ['25%', 'p25'],
+      ['50% (median)', 'p50'], ['75%', 'p75'], ['90%', 'p90'], ['Best', 'best'],
+    ];
+    let html = '<table class="sim-table"><thead><tr><th>Outcome</th><th>Net P&amp;L</th><th>ROI</th></tr></thead><tbody>';
+    for (const [label, key] of rows)
+      html += `<tr><td>${label}</td><td>${_simMoney(s[key])}</td><td>${_simPct(s.roi ? s.roi[key] : null)}</td></tr>`;
+    html += '</tbody></table>';
+    html += `<div class="sim-sub">Mean ${_simMoney(s.mean)} (${_simPct(s.roi ? s.roi.mean : null)}) · `
+          + `P(profit) ${s.p_profit.toFixed(1)}% · staked $${s.staked.toLocaleString(undefined, {maximumFractionDigits: 0})} · `
+          + `${s.n_sims.toLocaleString()} sims</div>`;
+    return html;
+  }
+  function renderSimulation(sim) {
+    const section = document.getElementById('simSection');
+    if (!sim || (!sim.combined && (!sim.per_game || !sim.per_game.length) && !sim.combos)) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+    if (sim.generated_at) {
+      const t = new Date(sim.generated_at);
+      const mins = Math.max(0, Math.round((Date.now() - t.getTime()) / 60000));
+      const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+      document.getElementById('simMeta').textContent = `Last run ${ago}`;
+    }
+    document.getElementById('simHeadline').innerHTML = sim.combined
+      ? `<div class="sim-headline-title">Combined portfolio — ${sim.n_simmable_games} game(s), `
+        + `${sim.n_positions_simmed} filled position(s)</div>` + _simTable(sim.combined)
+      : '';
+    let gamesHtml = (sim.per_game || []).filter(g => gameKept(g.game)).map((g, i) => {
+      const gid = `simdash-g${i}`;
+      return `<div class="sim-game">`
+        + `<div class="sim-game-header" onclick="(function(){var e=document.getElementById('${gid}');e.classList.toggle('collapsed');})()">`
+        + `▸ ${g.game} (${g.n_positions} position${g.n_positions !== 1 ? 's' : ''})</div>`
+        + `<div class="sim-game-body collapsed" id="${gid}">${_simTable(g)}</div></div>`;
+    }).join('');
+
+    // Combo positions from the sim run (already game-filtered server-side at
+    // run time; shown as-of that run, not re-filtered here).
+    const c = sim.combos;
+    if (c && c.positions && c.positions.length) {
+      const posRows = c.positions.map(p => `
+        <tr>
+          <td>${esc(p.combo)}</td>
+          <td style="text-align:center"><span class="badge-${p.side}">${p.side.toUpperCase()}</span></td>
+          <td>${(p.contracts || 0).toFixed(2)}</td>
+          <td>${_simMoney(p.staked)}</td>
+          <td>${p.p_win.toFixed(2)}%</td>
+          <td>${_simMoney(p.worst)}</td>
+          <td>${_simMoney(p.mean)}</td>
+          <td>${_simMoney(p.best)}</td>
+        </tr>`).join('');
+      gamesHtml += `<div class="sim-game">`
+        + `<div class="sim-game-header" onclick="(function(){var e=document.getElementById('simdash-combos');e.classList.toggle('collapsed');})()">`
+        + `▸ Combos (${c.n_positions} position${c.n_positions !== 1 ? 's' : ''})</div>`
+        + `<div class="sim-game-body collapsed" id="simdash-combos">`
+        + _simTable(c)
+        + `<div class="table-wrap"><table class="combo-table" style="margin-top:8px">`
+        + `<thead><tr><th>Combo</th><th>Side</th><th>Contracts</th><th>Staked</th>`
+        + `<th>P(win)</th><th>Worst</th><th>Mean</th><th>Best</th></tr></thead>`
+        + `<tbody>${posRows}</tbody></table></div>`
+        + `</div></div>`;
+    }
+    document.getElementById('simGames').innerHTML = gamesHtml;
+    const skips = sim.unsimmable || [];
+    document.getElementById('simSkipped').innerHTML = skips.length
+      ? `<b>${skips.length}</b> position(s) not simmable (game not in the current sim file).` : '';
   }
 
   loadData();
